@@ -1,14 +1,13 @@
-
-import * as Y from 'yjs'
-import * as cmState from '@codemirror/state' // eslint-disable-line
-import * as cmView from '@codemirror/view' // eslint-disable-line
-import { YRange } from './y-range.js'
+import * as Y from 'yjs';
+import * as cmState from '@codemirror/state'; // eslint-disable-line
+import * as cmView from '@codemirror/view'; // eslint-disable-line
+import { YRange } from './y-range.js';
 
 export class YSyncConfig {
-  constructor (ytext, awareness) {
-    this.ytext = ytext
-    this.awareness = awareness
-    this.undoManager = new Y.UndoManager(ytext)
+  constructor(ytext, awareness) {
+    this.ytext = ytext;
+    this.awareness = awareness;
+    this.undoManager = new Y.UndoManager(ytext());
   }
 
   /**
@@ -38,45 +37,45 @@ export class YSyncConfig {
    * @param {number} pos
    * @param {number} [assoc]
    */
-  toYPos (pos, assoc = 0) {
-    return Y.createRelativePositionFromTypeIndex(this.ytext, pos, assoc)
+  toYPos(pos, assoc = 0) {
+    return Y.createRelativePositionFromTypeIndex(this.ytext(), pos, assoc);
   }
 
   /**
    * @param {Y.RelativePosition | Object} rpos
    */
-  fromYPos (rpos) {
-    const pos = Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(rpos), this.ytext.doc)
-    if (pos == null || pos.type !== this.ytext) {
-      throw new Error('[y-codemirror] The position you want to retrieve was created by a different document')
+  fromYPos(rpos) {
+    const pos = Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(rpos), this.ytext().doc);
+    if (pos == null || pos.type !== this.ytext()) {
+      throw new Error('[y-codemirror] The position you want to retrieve was created by a different document');
     }
     return {
       pos: pos.index,
-      assoc: pos.assoc
-    }
+      assoc: pos.assoc,
+    };
   }
 
   /**
    * @param {cmState.SelectionRange} range
    * @return {YRange}
    */
-  toYRange (range) {
-    const assoc = range.assoc
-    const yanchor = this.toYPos(range.anchor, assoc)
-    const yhead = this.toYPos(range.head, assoc)
-    return new YRange(yanchor, yhead)
+  toYRange(range) {
+    const assoc = range.assoc;
+    const yanchor = this.toYPos(range.anchor, assoc);
+    const yhead = this.toYPos(range.head, assoc);
+    return new YRange(yanchor, yhead);
   }
 
   /**
    * @param {YRange} yrange
    */
-  fromYRange (yrange) {
-    const anchor = this.fromYPos(yrange.yanchor)
-    const head = this.fromYPos(yrange.yhead)
+  fromYRange(yrange) {
+    const anchor = this.fromYPos(yrange.yanchor);
+    const head = this.fromYPos(yrange.yhead);
     if (anchor.pos === head.pos) {
-      return cmState.EditorSelection.cursor(head.pos, head.assoc)
+      return cmState.EditorSelection.cursor(head.pos, head.assoc);
     }
-    return cmState.EditorSelection.range(anchor.pos, head.pos)
+    return cmState.EditorSelection.range(anchor.pos, head.pos);
   }
 }
 
@@ -84,15 +83,15 @@ export class YSyncConfig {
  * @type {cmState.Facet<YSyncConfig, YSyncConfig>}
  */
 export const ySyncFacet = cmState.Facet.define({
-  combine (inputs) {
-    return inputs[inputs.length - 1]
-  }
-})
+  combine(inputs) {
+    return inputs[inputs.length - 1];
+  },
+});
 
 /**
  * @type {cmState.AnnotationType<YSyncConfig>}
  */
-export const ySyncAnnotation = cmState.Annotation.define()
+export const ySyncAnnotation = cmState.Annotation.define();
 
 /**
  * @extends {PluginValue}
@@ -101,59 +100,85 @@ class YSyncPluginValue {
   /**
    * @param {cmView.EditorView} view
    */
-  constructor (view) {
-    this.view = view
-    this.conf = view.state.facet(ySyncFacet)
-    this.conf.ytext.observe((event, tr) => {
-      if (tr.origin !== this.conf) {
-        const delta = event.delta
-        const changes = []
-        let pos = 0
-        for (let i = 0; i < delta.length; i++) {
-          const d = delta[i]
-          if (d.insert != null) {
-            changes.push({ from: pos, to: pos, insert: d.insert })
-          } else if (d.delete != null) {
-            changes.push({ from: pos, to: pos + d.delete, insert: '' })
-            pos += d.delete
-          } else {
-            pos += d.retain
+  constructor(view) {
+    this.view = view;
+    this.conf = view.state.facet(ySyncFacet);
+    this.type = this.conf.ytext();
+
+    if (!this.type) return;
+
+    this.type.observe(
+      (this._observeCallback = (event, tr) => {
+        if (tr.origin !== this.conf) {
+          const delta = event.delta;
+          const changes = [];
+          let pos = 0;
+          for (let i = 0; i < delta.length; i++) {
+            const d = delta[i];
+            if (d.insert != null) {
+              changes.push({ from: pos, to: pos, insert: d.insert });
+            } else if (d.delete != null) {
+              changes.push({ from: pos, to: pos + d.delete, insert: '' });
+              pos += d.delete;
+            } else {
+              pos += d.retain;
+            }
           }
+          this.view.dispatch({ changes, annotations: [ySyncAnnotation.of(this.conf)] });
+        } else {
+          // event that we just sent out, ignore
         }
-        view.dispatch({ changes, annotations: [ySyncAnnotation.of(this.conf)] })
+      }),
+    );
+
+    // set network value in case it differs at construction time
+    setTimeout(() => {
+      if (view.state.doc.sliceString(0) !== this.type.toJSON()) {
+        view.dispatch({
+          changes: [
+            {
+              from: 0,
+              to: view.state.doc.length,
+              insert: this.type.toJSON(),
+            },
+          ],
+          annotations: [ySyncAnnotation.of(this.conf)],
+        });
       }
-    })
+    }, 0);
   }
 
   /**
    * @param {cmView.ViewUpdate} update
    */
-  update (update) {
-    if (!update.docChanged || (update.transactions.length > 0 && update.transactions[0].annotation(ySyncAnnotation) === this.conf)) {
-      return
+  update(update) {
+    if (
+      !update.docChanged ||
+      (update.transactions.length > 0 && update.transactions[0].annotation(ySyncAnnotation)?.ytext() === this.type)
+    ) {
+      return;
     }
-    const ytext = this.conf.ytext
-    ytext.doc.transact(() => {
+    this.type.doc.transact(() => {
       /**
        * This variable adjusts the fromA position to the current position in the Y.Text type.
        */
-      let adj = 0
+      let adj = 0;
       update.changes.iterChanges((fromA, toA, fromB, toB, insert) => {
-        const insertText = insert.sliceString(0, insert.length, '\n')
+        const insertText = insert.sliceString(0, insert.length, '\n');
         if (fromA !== toA) {
-          ytext.delete(fromA + adj, toA - fromA)
+          this.type.delete(fromA + adj, toA - fromA);
         }
         if (insertText.length > 0) {
-          ytext.insert(fromA + adj, insertText)
+          this.type.insert(fromA + adj, insertText);
         }
-        adj += insertText.length - (toA - fromA)
-      })
-    }, this.conf)
+        adj += insertText.length - (toA - fromA);
+      });
+    }, this.conf);
   }
 
-  destroy () {
-    // @todo
+  destroy() {
+    this.type?.unobserve(this._observeCallback);
   }
 }
 
-export const ySync = cmView.ViewPlugin.fromClass(YSyncPluginValue)
+export const ySync = cmView.ViewPlugin.fromClass(YSyncPluginValue);

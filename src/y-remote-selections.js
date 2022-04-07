@@ -1,21 +1,19 @@
+import * as cmView from '@codemirror/view';
 
-import * as cmView from '@codemirror/view'
+import * as cmRangeSet from '@codemirror/rangeset';
+import * as cmState from '@codemirror/state';
+import * as dom from 'lib0/dom';
+import * as pair from 'lib0/pair';
+import * as math from 'lib0/math';
 
-import * as cmRangeSet from '@codemirror/rangeset'
-import * as cmState from '@codemirror/state'
-import * as dom from 'lib0/dom'
-import * as pair from 'lib0/pair'
-import * as math from 'lib0/math'
-
-import * as Y from 'yjs'
-import { ySyncFacet } from './y-sync.js'
+import * as Y from 'yjs';
+import { ySyncFacet } from './y-sync.js';
 
 export const yRemoteSelectionsTheme = cmView.EditorView.baseTheme({
-  '.cm-ySelection': {
-  },
+  '.cm-ySelection': {},
   '.cm-yLineSelection': {
     padding: 0,
-    margin: '0px 2px 0px 4px'
+    margin: '0px 2px 0px 4px',
   },
   '.cm-ySelectionCaret': {
     position: 'relative',
@@ -24,7 +22,7 @@ export const yRemoteSelectionsTheme = cmView.EditorView.baseTheme({
     marginLeft: '-1px',
     marginRight: '-1px',
     boxSizing: 'border-box',
-    display: 'inline'
+    display: 'inline',
   },
   '.cm-ySelectionCaret::before': {
     content: '"\u00a0"', // this is a unicode non-breaking space
@@ -35,11 +33,11 @@ export const yRemoteSelectionsTheme = cmView.EditorView.baseTheme({
     top: '-.2em',
     left: '-.2em',
     backgroundColor: 'inherit',
-    transition: 'transform .3s ease-in-out'
+    transition: 'transform .3s ease-in-out',
   },
   '.cm-ySelectionCaret:hover::before': {
     transformOrigin: 'bottom center',
-    transform: 'scale(0)'
+    transform: 'scale(0)',
   },
   '.cm-ySelectionInfo': {
     position: 'absolute',
@@ -59,57 +57,62 @@ export const yRemoteSelectionsTheme = cmView.EditorView.baseTheme({
     backgroundColor: 'inherit',
     // these should be separate
     opacity: 0,
-    transitionDelay: '0s'
+    transitionDelay: '0s',
   },
   '.cm-ySelectionCaret:hover > .cm-ySelectionInfo': {
     opacity: 1,
-    transitionDelay: '0s'
-  }
-})
+    transitionDelay: '0s',
+  },
+});
 
 /**
  * @todo specify the users that actually changed. Currently, we recalculate positions for every user.
  * @type {cmState.AnnotationType<Array<number>>}
  */
-const yRemoteSelectionsAnnotation = cmState.Annotation.define()
+const yRemoteSelectionsAnnotation = cmState.Annotation.define();
 
 class YRemoteCaretWidget extends cmView.WidgetType {
   /**
    * @param {string} color
    * @param {string} name
    */
-  constructor (color, name) {
-    super()
-    this.color = color
-    this.name = name
+  constructor(color, name) {
+    super();
+    this.color = color;
+    this.name = name;
   }
 
-  toDOM () {
-    return /** @type {HTMLElement} */ (dom.element('span', [pair.create('class', 'cm-ySelectionCaret'), pair.create('style', `background-color: ${this.color}; border-color: ${this.color}`)], [
-      dom.element('div', [
-        pair.create('class', 'cm-ySelectionInfo')
-      ], [
-        dom.text(this.name)
-      ])
-    ]))
+  toDOM() {
+    return /** @type {HTMLElement} */ (
+      dom.element(
+        'span',
+        [
+          pair.create('class', 'cm-ySelectionCaret'),
+          pair.create('style', `background-color: ${this.color}; border-color: ${this.color}`),
+        ],
+        [dom.element('div', [pair.create('class', 'cm-ySelectionInfo')], [dom.text(this.name)])],
+      )
+    );
   }
 
-  eq (widget) {
-    return widget.color === this.color
+  eq(widget) {
+    return widget.color === this.color;
   }
 
-  compare (widget) {
-    return widget.color === this.color
+  compare(widget) {
+    return widget.color === this.color;
   }
 
-  updateDOM () {
-    return false
+  updateDOM() {
+    return false;
   }
 
-  get estimatedHeight () { return -1 }
+  get estimatedHeight() {
+    return -1;
+  }
 
-  ignoreEvent () {
-    return true
+  ignoreEvent() {
+    return true;
   }
 }
 
@@ -117,38 +120,41 @@ export class YRemoteSelectionsPluginValue {
   /**
    * @param {cmView.EditorView} view
    */
-  constructor (view) {
-    this.conf = view.state.facet(ySyncFacet)
+  constructor(view) {
+    this.conf = view.state.facet(ySyncFacet);
     this.conf.awareness.on('change', ({ added, updated, removed }, s, t) => {
-      const clients = added.concat(updated).concat(removed)
+      const clients = added.concat(updated).concat(removed);
       if (clients.findIndex(id => id !== this.conf.awareness.doc.clientID) >= 0) {
-        view.dispatch({ annotations: [yRemoteSelectionsAnnotation.of([])] })
+        view.dispatch({ annotations: [yRemoteSelectionsAnnotation.of([])] });
       }
-    })
+    });
     /**
      * @type {cmView.DecorationSet}
      */
-    this.decorations = cmRangeSet.RangeSet.of([])
+    this.decorations = cmRangeSet.RangeSet.of([]);
   }
 
   /**
    * @param {cmView.ViewUpdate} update
    */
-  update (update) {
-    const ytext = this.conf.ytext
-    const ydoc = /** @type {Y.Doc} */ (ytext.doc)
-    const awareness = this.conf.awareness
+  update(update) {
+    const ytext = this.conf.ytext();
+    if (!ytext) return;
+    const ydoc = /** @type {Y.Doc} */ (ytext.doc);
+    const awareness = this.conf.awareness;
     /**
      * @type {Array<cmRangeSet.Range<cmView.Decoration>>}
      */
-    const decorations = []
-    const localAwarenessState = this.conf.awareness.getLocalState()
+    const decorations = [];
+    const localAwarenessState = this.conf.awareness.getLocalState();
 
     // set local awareness state (update cursors)
     if (localAwarenessState != null) {
-      const sel = update.state.selection.main
-      const currentAnchor = localAwarenessState.cursor == null ? null : Y.createRelativePositionFromJSON(localAwarenessState.cursor.anchor)
-      const currentHead = localAwarenessState.cursor == null ? null : Y.createRelativePositionFromJSON(localAwarenessState.cursor.head)
+      const sel = update.state.selection.main;
+      const currentAnchor =
+        localAwarenessState.cursor == null ? null : Y.createRelativePositionFromJSON(localAwarenessState.cursor.anchor);
+      const currentHead =
+        localAwarenessState.cursor == null ? null : Y.createRelativePositionFromJSON(localAwarenessState.cursor.head);
 
       /*
       if (!update.view.hasFocus || !update.view.dom.ownerDocument.hasFocus()) {
@@ -156,39 +162,43 @@ export class YRemoteSelectionsPluginValue {
       }
       */
       if (sel != null) {
-        const anchor = Y.createRelativePositionFromTypeIndex(ytext, sel.anchor)
-        const head = Y.createRelativePositionFromTypeIndex(ytext, sel.head)
-        if (localAwarenessState.cursor == null || !Y.compareRelativePositions(currentAnchor, anchor) || !Y.compareRelativePositions(currentHead, head)) {
+        const anchor = Y.createRelativePositionFromTypeIndex(ytext, sel.anchor);
+        const head = Y.createRelativePositionFromTypeIndex(ytext, sel.head);
+        if (
+          localAwarenessState.cursor == null ||
+          !Y.compareRelativePositions(currentAnchor, anchor) ||
+          !Y.compareRelativePositions(currentHead, head)
+        ) {
           awareness.setLocalStateField('cursor', {
             anchor,
-            head
-          })
+            head,
+          });
         }
       } else if (localAwarenessState.cursor != null) {
-        awareness.setLocalStateField('cursor', null)
+        awareness.setLocalStateField('cursor', null);
       }
     }
 
     // update decorations (remote selections)
     awareness.getStates().forEach((state, clientid) => {
       if (clientid === awareness.doc.clientID) {
-        return
+        return;
       }
-      const cursor = state.cursor
+      const cursor = state.cursor;
       if (cursor == null || cursor.anchor == null || cursor.head == null) {
-        return
+        return;
       }
-      const anchor = Y.createAbsolutePositionFromRelativePosition(cursor.anchor, ydoc)
-      const head = Y.createAbsolutePositionFromRelativePosition(cursor.head, ydoc)
+      const anchor = Y.createAbsolutePositionFromRelativePosition(cursor.anchor, ydoc);
+      const head = Y.createAbsolutePositionFromRelativePosition(cursor.head, ydoc);
       if (anchor == null || head == null || anchor.type !== ytext || head.type !== ytext) {
-        return
+        return;
       }
-      const { color = '#30bced', name = 'Anonymous' } = state.user || {}
-      const colorLight = (state.user && state.user.colorLight) || color + '33'
-      const start = math.min(anchor.index, head.index)
-      const end = math.max(anchor.index, head.index)
-      const startLine = update.view.state.doc.lineAt(start)
-      const endLine = update.view.state.doc.lineAt(end)
+      const { color = '#30bced', name = 'Anonymous' } = state.user || {};
+      const colorLight = (state.user && state.user.colorLight) || color + '33';
+      const start = math.min(anchor.index, head.index);
+      const end = math.max(anchor.index, head.index);
+      const startLine = update.view.state.doc.lineAt(start);
+      const endLine = update.view.state.doc.lineAt(end);
       if (startLine.number === endLine.number) {
         // selected content in a single line.
         decorations.push({
@@ -196,9 +206,9 @@ export class YRemoteSelectionsPluginValue {
           to: end,
           value: cmView.Decoration.mark({
             attributes: { style: `background-color: ${colorLight}` },
-            class: 'cm-ySelection'
-          })
-        })
+            class: 'cm-ySelection',
+          }),
+        });
       } else {
         // selected content in multiple lines
         // first, render text-selection in the first line
@@ -207,27 +217,27 @@ export class YRemoteSelectionsPluginValue {
           to: startLine.from + startLine.length,
           value: cmView.Decoration.mark({
             attributes: { style: `background-color: ${colorLight}` },
-            class: 'cm-ySelection'
-          })
-        })
+            class: 'cm-ySelection',
+          }),
+        });
         // render text-selection in the last line
         decorations.push({
           from: endLine.from,
           to: end,
           value: cmView.Decoration.mark({
             attributes: { style: `background-color: ${colorLight}` },
-            class: 'cm-ySelection'
-          })
-        })
+            class: 'cm-ySelection',
+          }),
+        });
         for (let i = startLine.number + 1; i < endLine.number; i++) {
-          const linePos = update.view.state.doc.line(i).from
+          const linePos = update.view.state.doc.line(i).from;
           decorations.push({
             from: linePos,
             to: linePos,
             value: cmView.Decoration.line({
-              attributes: { style: `background-color: ${colorLight}`, class: 'cm-yLineSelection' }
-            })
-          })
+              attributes: { style: `background-color: ${colorLight}`, class: 'cm-yLineSelection' },
+            }),
+          });
         }
       }
       decorations.push({
@@ -236,14 +246,14 @@ export class YRemoteSelectionsPluginValue {
         value: cmView.Decoration.widget({
           side: head.index - anchor.index > 0 ? -1 : 1, // the local cursor should be rendered outside the remote selection
           block: false,
-          widget: new YRemoteCaretWidget(color, name)
-        })
-      })
-    })
-    this.decorations = cmView.Decoration.set(decorations, true)
+          widget: new YRemoteCaretWidget(color, name),
+        }),
+      });
+    });
+    this.decorations = cmView.Decoration.set(decorations, true);
   }
 }
 
 export const yRemoteSelections = cmView.ViewPlugin.fromClass(YRemoteSelectionsPluginValue, {
-  decorations: v => v.decorations
-})
+  decorations: v => v.decorations,
+});
