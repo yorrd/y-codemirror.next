@@ -10,13 +10,13 @@ import { yUndoManager, yUndoManagerFacet, YUndoManagerConfig, undo, redo, yUndoM
 export { yRemoteSelections, yRemoteSelectionsTheme, ySync, ySyncFacet, YSyncConfig, yUndoManagerKeymap }
 
 /**
- * @param {Y.Text} ytext
+ * @param {() => Y.Text} ytext
  * @param {any} awareness
  * @param {Object} [opts]
  * @param {Y.UndoManager | false} [opts.undoManager] Set undoManager to false to disable the undo-redo plugin
  * @return {cmState.Extension}
  */
-export const yCollab = (ytext, awareness, { undoManager = new Y.UndoManager(ytext) } = {}) => {
+export const yCollab = (ytext, awareness, { undoManager = new Y.UndoManager(ytext()) } = {}) => {
   const ySyncConfig = new YSyncConfig(ytext, awareness)
   const plugins = [
     ySyncFacet.of(ySyncConfig),

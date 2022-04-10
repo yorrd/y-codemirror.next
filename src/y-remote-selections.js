@@ -141,7 +141,7 @@ export class YRemoteSelectionsPluginValue {
    * @param {cmView.ViewUpdate} update
    */
   update (update) {
-    const ytext = this.conf.ytext
+    const ytext = this.conf.ytext()
     const ydoc = /** @type {Y.Doc} */ (ytext.doc)
     const awareness = this.conf.awareness
     /**

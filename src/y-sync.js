@@ -8,7 +8,7 @@ export class YSyncConfig {
   constructor (ytext, awareness) {
     this.ytext = ytext
     this.awareness = awareness
-    this.undoManager = new Y.UndoManager(ytext)
+    this.undoManager = new Y.UndoManager(ytext())
   }
 
   /**
@@ -39,15 +39,15 @@ export class YSyncConfig {
    * @param {number} [assoc]
    */
   toYPos (pos, assoc = 0) {
-    return Y.createRelativePositionFromTypeIndex(this.ytext, pos, assoc)
+    return Y.createRelativePositionFromTypeIndex(this.ytext(), pos, assoc)
   }
 
   /**
    * @param {Y.RelativePosition | Object} rpos
    */
   fromYPos (rpos) {
-    const pos = Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(rpos), this.ytext.doc)
-    if (pos == null || pos.type !== this.ytext) {
+    const pos = Y.createAbsolutePositionFromRelativePosition(Y.createRelativePositionFromJSON(rpos), this.ytext().doc)
+    if (pos == null || pos.type !== this.ytext()) {
       throw new Error('[y-codemirror] The position you want to retrieve was created by a different document')
     }
     return {
@@ -123,7 +123,7 @@ class YSyncPluginValue {
         view.dispatch({ changes, annotations: [ySyncAnnotation.of(this.conf)] })
       }
     }
-    this._ytext = this.conf.ytext
+    this._ytext = this.conf.ytext()
     this._ytext.observe(this._observer)
   }
 
@@ -134,7 +134,7 @@ class YSyncPluginValue {
     if (!update.docChanged || (update.transactions.length > 0 && update.transactions[0].annotation(ySyncAnnotation) === this.conf)) {
       return
     }
-    const ytext = this.conf.ytext
+    const ytext = this.conf.ytext()
     ytext.doc.transact(() => {
       /**
        * This variable adjusts the fromA position to the current position in the Y.Text type.
