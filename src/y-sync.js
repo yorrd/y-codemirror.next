@@ -126,10 +126,11 @@ class YSyncPluginValue {
     this._ytext = this.conf.ytext()
     this._ytext?.observe(this._observer)
 
-    if(this._ytext)
-    setTimeout(() => {
-      view.dispatch({ changes: [{ from: 0, to: view.state.doc.length, insert: this._ytext.toJSON() }], annotations: [ySyncAnnotation.of(this.conf)] });
-    }, 0);
+    if (this._ytext)
+      setTimeout(() => {
+        if (this._ytext !== this.conf.ytext()) return;
+        view.dispatch({ changes: [{ from: 0, to: view.state.doc.length, insert: this._ytext.toJSON() }], annotations: [ySyncAnnotation.of(this.conf)] });
+      }, 0);
   }
 
   /**
