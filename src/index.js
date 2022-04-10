@@ -16,7 +16,7 @@ export { yRemoteSelections, yRemoteSelectionsTheme, ySync, ySyncFacet, YSyncConf
  * @param {Y.UndoManager | false} [opts.undoManager] Set undoManager to false to disable the undo-redo plugin
  * @return {cmState.Extension}
  */
-export const yCollab = (ytext, awareness, { undoManager = new Y.UndoManager(ytext()) } = {}) => {
+export const yCollab = (ytext, awareness, { undoManager = false } = {}) => {
   const ySyncConfig = new YSyncConfig(ytext, awareness)
   const plugins = [
     ySyncFacet.of(ySyncConfig),
