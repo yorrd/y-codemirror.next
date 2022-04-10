@@ -142,6 +142,7 @@ export class YRemoteSelectionsPluginValue {
    */
   update (update) {
     const ytext = this.conf.ytext()
+    if (!ytext) return;
     const ydoc = /** @type {Y.Doc} */ (ytext.doc)
     const awareness = this.conf.awareness
     /**
