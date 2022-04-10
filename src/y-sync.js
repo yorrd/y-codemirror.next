@@ -124,7 +124,12 @@ class YSyncPluginValue {
       }
     }
     this._ytext = this.conf.ytext()
-    this._ytext.observe(this._observer)
+    this._ytext?.observe(this._observer)
+
+    if(this._ytext)
+    setTimeout(() => {
+      view.dispatch({ changes: [{ from: 0, to: view.state.doc.length, insert: '' }], annotations: [ySyncAnnotation.of(this.conf)] });
+    }, 0);
   }
 
   /**
@@ -135,7 +140,7 @@ class YSyncPluginValue {
       return
     }
     const ytext = this.conf.ytext()
-    ytext.doc.transact(() => {
+    ytext?.doc.transact(() => {
       /**
        * This variable adjusts the fromA position to the current position in the Y.Text type.
        */
@@ -154,7 +159,7 @@ class YSyncPluginValue {
   }
 
   destroy () {
-    this._ytext.unobserve(this._observer)
+    this._ytext?.unobserve(this._observer)
   }
 }
 
