@@ -128,7 +128,7 @@ class YSyncPluginValue {
 
     if(this._ytext)
     setTimeout(() => {
-      view.dispatch({ changes: [{ from: 0, to: view.state.doc.length, insert: '' }], annotations: [ySyncAnnotation.of(this.conf)] });
+      view.dispatch({ changes: [{ from: 0, to: view.state.doc.length, insert: this._ytext.toJSON() }], annotations: [ySyncAnnotation.of(this.conf)] });
     }, 0);
   }
 
